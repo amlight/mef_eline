@@ -6,14 +6,17 @@ NApp to provision circuits from user request
 from kytos.core import KytosNApp, log, rest
 from flask import request
 
-from napps.amlight.mef_eline import settings
+from . import settings
+from .models import Endpoint
 
 
 class Main(KytosNApp):
-    """Main class of amlight/mef_eline NApp.
+    """Main class of amlight/mef_eline_old NApp.
 
     This class is the entry point for this napp.
     """
+    def __init__(self):
+        pass
 
     def setup(self):
         """Replace the '__init__' method for the KytosNApp subclass.
@@ -66,3 +69,62 @@ class Main(KytosNApp):
     @rest('/circuits/byUNI/<dpid>/<port>')
     def circuits_by_uni(self, dpid, port):
         pass
+
+#     def install_circuit_flows(self):
+#         circuits = []
+#
+#         self.circuitManager.install_flows()
+#
+# #
+# class CircuitManager():
+#     def __init__(self):
+#         self.circuits = []
+#         self.id_counter = 0
+#
+#     def _new_circuit_id(self):
+#         self.id_counter = self.id_counter + 1
+#         return self.id_counter
+#
+#     def save_circuit(self, circuit):
+#         if circuit is not None:
+#             circuit_id = self._new_circuit_id()
+#             self.circuits[circuit_id] = circuit
+#
+#     def retrieve_circuit(self, endpoint_a, endpoit_z):
+#         for c in self.circuits:
+#             for e in c.path._endpoints:
+#                 e._dpid
+#                 e._port
+#         pass
+#
+#     def install_circuit_flows(self):
+#
+#         for circuit in self.circuits:
+#             for link in circuit.links:
+#                 link.endpoint_a
+#                 link.endpoint_b
+#
+#                 _install_flow(link.endpoint_a, link.endpoint_b)
+#
+#
+#     def _install_flow(self, endpoint_a, endpoit_z):
+#
+#         try:
+#             flow_manager_install_url = settings.FLOW_MANAGER_INSTALL_FLOW_URL.format(dpid=endpoint_a.dpid)
+#             result = requests.get(url=pathfinder_url)
+#
+#             log.debug(pathfinder_url)
+#
+#             if result.status_code == 200:
+#                 result = json.loads(result.content)
+#                 self._paths = result['paths']
+#             else:
+#                 raise Exception(result.status_code)
+#         except:
+#             e = sys.exc_info()
+#             log.error('Error: Can not connect to Kytos/Pathfinder: %s %s', e[0], e[1])
+#         endpoint_a
+#         endpoint_a
+#
+#
+#         result = requests.get(url=pathfinder_url)
