@@ -1,0 +1,218 @@
+swagger: '2.0'
+info:
+  version: '0.1'
+  title: Kytos Circuit Provisioning
+  description: Kytos NApp for provisioning of SDN circuits.
+  contact:
+    name: Antonio
+    email: antonio@amlight.net
+basePath: /kytos/circuit_provisioning
+schemes:
+  - https
+paths:
+  /circuit:
+    post:
+      summary: Creates a new circuit
+      description: Creates a new circuit based on the endpoints and constraints given
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: body
+          name: circuit
+          description: Circuit endpoints and constraints
+          required: true
+          schema:
+            $ref: '#/definitions/NewCircuit'
+      responses:
+        '200':
+          description: OK
+  '/circuit/{circuitId}':
+    get:
+      summary: Get details of a circuit
+      description: Show the details of a single circuit
+      produces:
+        - applications/json
+      parameters:
+        - name: circuitId
+          in: path
+          required: true
+          type: integer
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Updates a circuit
+      description: Updates an existing circuit based on data given
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: body
+          name: circuit
+          description: Circuit endpoints and constraints
+          required: true
+          schema:
+            $ref: '#/definitions/NewCircuit'
+      responses:
+        '200':
+          description: OK
+    delete:
+      summary: Removes a circuit
+      description: ''
+      parameters:
+        - name: circuitId
+          in: path
+          required: true
+          type: integer
+      responses:
+        '200':
+          description: OK
+  /circuits:
+    get:
+      summary: All circuts
+      description: Gets all circuits
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Circuit'
+  '/circuits/byLink/{linkId}':
+    get:
+      summary: Circuits by link
+      description: Gets all circuits using given link
+      parameters:
+        - name: linkId
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Circuit'
+  '/circuits/byUNI/{dpid}/{port}':
+    get:
+      summary: Circuits by UNI
+      description: Gets all circuits using given UNI (dpid and port)
+      parameters:
+        - name: dpid
+          in: path
+          required: true
+          type: string
+        - name: port
+          in: path
+          required: true
+          type: string
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Circuit'
+definitions:
+  NewCircuit:
+    type: object
+    required:
+      - uni_a
+      - uni_z
+    properties:
+      uni_a:
+        $ref: '#/definitions/Endpoint'
+      uni_z:
+        $ref: '#/definitions/Endpoint'
+      start_date:
+        type: string
+        format: date-time
+      end_date:
+        type: string
+        format: date-time
+      bandwidth:
+        type: integer
+        format: int64
+      links:
+        type: array
+        items:
+          type: string
+      backup_links:
+        type: array
+        items:
+          type: string
+  Endpoint:
+    type: object
+    required:
+      - dpid
+      - port
+    properties:
+      dpid:
+        type: string
+        format: "00:00:00:00:00:00:00:00"
+      port:
+        type: string
+      tag:
+        $ref: '#/definitions/Tag'
+  Link:
+    type: object
+    required:
+      - id
+      - endpoint_a
+      - endpoint_b
+    properties:
+      id:
+        type: string
+      endpoint_a:
+        $ref: '#/definitions/Endpoint'
+      endpoint_b:
+        $ref: '#/definitions/Endpoint'
+  Path:
+    type: object
+    required:
+      - endpoints
+    properties:
+      id:
+        type: integer
+        format: int32
+      endpoints:
+        type: array
+        items:
+          $ref: '#/definitions/Endpoint'
+  Circuit:
+    type: object
+    required:
+      - id
+      - name
+      - path
+    properties:
+      id:
+        type: integer
+        format: int32
+      name:
+        type: string
+      path:
+        $ref: '#/definitions/Path'
+      backup:
+        $ref: '#/definitions/Path'
+      start_date:
+        type: string
+        format: date-time
+      end_date:
+        type: string
+        format: date-time
+  Tag:
+    type: object
+    required:
+      - type
+      - value
+    properties:
+      type:
+        type: string
+      value:
+        type: string
+
