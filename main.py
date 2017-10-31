@@ -6,6 +6,7 @@ NApp to provision circuits from user request
 from kytos.core import KytosNApp, log, rest
 from flask import request, abort
 from napps.amlight.mef_eline.models import NewCircuit, Endpoint, Circuit
+from napps.amlight.mef_eline.flowmanager import FlowManager
 import json
 import requests
 import hashlib
@@ -31,8 +32,11 @@ class Main(KytosNApp):
 
         So, if you have any setup routine, insert it here.
         """
+        self._scheduled_circuits = []
         self._installed_circuits = {'ids': SortedDict(), 'ports': SortedDict()}
         self._pathfinder_url = 'http://localhost:8181/api/kytos/pathfinder/v1/%s/%s'
+
+        self.execute_as_loop(30)
 
     def execute(self):
         """This method is executed right after the setup method execution.
@@ -42,7 +46,12 @@ class Main(KytosNApp):
 
             self.execute_as_loop(30)  # 30-second interval.
         """
-        pass
+        for circuit in self._scheduled_circuits:
+            self._scheduled_circuits.remove(circuit)
+
+            # TODO check start date to install circuit
+            self._install_circuit(circuit)
+
 
     def shutdown(self):
         """This method is executed when your napp is unloaded.
@@ -91,8 +100,18 @@ class Main(KytosNApp):
                 if len(endpoint) > 23:
                     port = endpoint[24:]
                     endpoints.append(Endpoint(dpid, port))
+
+            # TODO: check start date
+            # se não tiver start date, colocar NOW
+            # jogar em uma fila para o deamon fazer a instalacao dos flows
+
             circuit = Circuit(m.hexdigest(), data['name'], endpoints)
-            self.add_circuit(circuit)
+
+            # Schedule circuit to install
+            self._scheduled_circuits.push(circuit)
+
+
+
         else:
             abort(400)
         return json.dumps(circuit._id)
@@ -117,6 +136,14 @@ class Main(KytosNApp):
     @rest('/circuits/byUNI/<dpid>/<port>')
     def circuits_by_uni(self, dpid, port):
         pass
+
+    def _install_circuit(self, circuit):
+        self.add_circuit(circuit)
+
+
+
+        flowManager = FlowManager()
+        flowManager.install_circuit(circuit)
 
 #     def install_circuit_flows(self):
 #         circuits = []

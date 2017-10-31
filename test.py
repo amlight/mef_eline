@@ -7,7 +7,7 @@ from unittest import TestCase
 from unittest.mock import Mock, patch
 
 # from .main import CircuitManager
-from .models import Endpoint
+from napps.amlight.mef_eline.models import Endpoint
 # from .pathfinder import Pathfinder
 from .flowmanager import FlowManager
 
@@ -43,10 +43,13 @@ class TestFlowManager(TestCase):
     def test_install_flow(self):
         flowmanager = FlowManager()
 
-        endpoint_a = Endpoint()
-        endpoint_b = Endpoint()
+        endpoint_a = Endpoint('00:00:00:00:00:00:00:01', '5')
+        endpoint_b = Endpoint('00:00:00:00:00:00:00:02', '5')
 
-        flowmanager.install_flow(endpoint_a, endpoint_b)
+        flow = flowmanager.install_flow(endpoint_a, endpoint_b)
+        print ('asdfasfdsadfasfd')
+        print (flow)
 
         # TODO test
         self.fail()
+
