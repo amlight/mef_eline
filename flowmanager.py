@@ -1,70 +1,78 @@
 """
-    Module to interact with Pathfinder Napp.
+    Module to interact with Kytos FlowManager Napp.
 """
-
-import sys
 import requests
-import json
-from kytos.core import log
-from napps.kytos.of_core.flow import Flow
+from http import HTTPStatus
 
-from . import settings
+from kytos.core import log
+from napps.kytos.of_core.v0x01.flow import Flow
+
+from napps.amlight.mef_eline import settings
+from napps.amlight.mef_eline.models import Endpoint
 
 
 class FlowManager(object):
 
+    # Receive Kytos controller
+    def __init__(self, controller):
+        """
+        Args:
+            controller (Controller): Receive Kytos controller
+        """
+        self.controller = controller
+
     def install_circuit(self, circuit):
-        if circuit is not None and circuit.path is not None:
-            endpoints = circuit.path._endpoints
+        if circuit is not None and circuit._path is not None:
+            endpoints = circuit._path._endpoints
             for i in range(len(endpoints) - 1):
-                self.install_flow(endpoints[i], endpoints[i + 1])
+                if i%2 == 0:
+                    self._install_flow(endpoints[i], endpoints[i + 1])
         else:
             raise ValueError("Circuit is missing.")
 
 
-    def install_flow(self, endpoint_a, endpoint_b):
-
-        try:
-            flow_manager_install_url = settings.FLOW_MANAGER_INSTALL_FLOW_URL.format(dpid=endpoint_a.dpid)
-            flow = self._flow_body_generator(endpoint_a, endpoint_b)
-
-            result = requests.post(flow_manager_install_url, json=[flow.as_dict()['flow']])
-
-            log.debug(flow_manager_install_url)
-
-            if result.status_code == 202:
-                # Flow message sent
-                return flow
-            else:
-                raise Exception(result.status_code)
-        except:
-            e = sys.exc_info()
-            log.error('Error: Can not connect to Kytos/FlowManager: %s %s', e[0], e[1])
-
-
-
-
-    def _flow_body_generator(self, endpoint_a, endpoint_b):
+    def _install_flow(self, endpoint_a, endpoint_b):
         if endpoint_a is None:
             raise ValueError("Endpoint A is missing.")
         if endpoint_b is None:
             raise ValueError("Endpoint Z is missing.")
 
-        flow = Flow()
+        # Build flow_manager URL
+        flow_manager_install_url = settings.FLOW_MANAGER_INSTALL_FLOW_URL.format(dpid=endpoint_a._dpid)
+        # Generate flow_manager request body
+        flow = self._install_flow_req_body_generator(endpoint_a, endpoint_b)
 
-        #r = requests.post(self._flow_mgr_url % dpid, json=[flow.as_dict()['flow']])
+        # Send request to flow_manager NAppp
+        result = requests.post(flow_manager_install_url, json=[flow.as_dict()])
 
+        if result.status_code == HTTPStatus.ACCEPTED:
+            # Flow message sent
+            return flow
+        else:
+            raise Exception(flow_manager_install_url + '\ncode: ' + str(result.status_code))
+
+
+    def _install_flow_req_body_generator(self, endpoint_a: Endpoint, endpoint_b: Endpoint):
+        if endpoint_a is None:
+            raise ValueError("Endpoint A is missing.")
+        if endpoint_b is None:
+            raise ValueError("Endpoint Z is missing.")
+
+        # Build a basic flow from settings template
         flow_dict = settings.flow_dict_v10  # Future expansion to OF1.3
-        flow = Flow.from_dict(flow_dict)
 
-        flow.match.in_port = endpoint_a.port
-        flow.actions[0].value = endpoint_b.port
+        # Change flow values to match endpoint A to output to endpoint B
+        flow = Flow.from_dict(flow_dict, self.controller.get_switch_by_dpid(endpoint_a._dpid))
 
-        # Setting vlan
-        if endpoint_a.tag is not None and endpoint_a.tag.type == 'vlan':
-            flow.match.dl_vlan = endpoint_a.tag.value
-        # Setting vlan
-        if endpoint_b.tag is not None and endpoint_b.tag.type == 'vlan':
-            flow.match.dl_vlan = endpoint_a.tag.value
+        flow.match.in_port = endpoint_a._port
+        flow.actions[0].value = endpoint_b._port
+        flow.actions[0].port = endpoint_b._port
+
+        # Setting endpoint A vlan
+        if endpoint_a._tag is not None and endpoint_a._tag.type == 'vlan':
+            flow.match.dl_vlan = endpoint_a._tag.value
+        # Setting endpoint B vlan
+        if endpoint_b._tag is not None and endpoint_b._tag.type == 'vlan':
+            flow.match.dl_vlan = endpoint_b.tag.value
 
         return flow

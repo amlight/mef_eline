@@ -21,8 +21,6 @@ class Main(KytosNApp):
 
     This class is the entry point for this napp.
     """
-    def __init__(self):
-        pass
 
     def setup(self):
         """Replace the '__init__' method for the KytosNApp subclass.
@@ -36,7 +34,7 @@ class Main(KytosNApp):
         self._installed_circuits = {'ids': SortedDict(), 'ports': SortedDict()}
         self._pathfinder_url = 'http://localhost:8181/api/kytos/pathfinder/v1/%s/%s'
 
-        self.execute_as_loop(30)
+        #self.execute_as_loop(30)
 
     def execute(self):
         """This method is executed right after the setup method execution.
@@ -46,11 +44,13 @@ class Main(KytosNApp):
 
             self.execute_as_loop(30)  # 30-second interval.
         """
-        for circuit in self._scheduled_circuits:
-            self._scheduled_circuits.remove(circuit)
 
-            # TODO check start date to install circuit
-            self._install_circuit(circuit)
+
+        # for circuit in self._scheduled_circuits:
+        #     self._scheduled_circuits.remove(circuit)
+        #
+        #     # TODO check start date to install circuit
+        #     self._install_circuit(circuit)
 
 
     def shutdown(self):
@@ -138,68 +138,17 @@ class Main(KytosNApp):
         pass
 
     def _install_circuit(self, circuit):
+        """Install the flows of a circuit path.
+        Only the main path will be installed. The backup path will not be used here.
+
+        Args:
+            circuit (Circuit): Circuit with a path specified to be installed
+        """
+
+        # Save the circuit
         self.add_circuit(circuit)
 
-
-
-        flowManager = FlowManager()
+        # Install the circuit path
+        flowManager = FlowManager(self.controller)
         flowManager.install_circuit(circuit)
 
-#     def install_circuit_flows(self):
-#         circuits = []
-#
-#         self.circuitManager.install_flows()
-#
-# #
-# class CircuitManager():
-#     def __init__(self):
-#         self.circuits = []
-#         self.id_counter = 0
-#
-#     def _new_circuit_id(self):
-#         self.id_counter = self.id_counter + 1
-#         return self.id_counter
-#
-#     def save_circuit(self, circuit):
-#         if circuit is not None:
-#             circuit_id = self._new_circuit_id()
-#             self.circuits[circuit_id] = circuit
-#
-#     def retrieve_circuit(self, endpoint_a, endpoit_z):
-#         for c in self.circuits:
-#             for e in c.path._endpoints:
-#                 e._dpid
-#                 e._port
-#         pass
-#
-#     def install_circuit_flows(self):
-#
-#         for circuit in self.circuits:
-#             for link in circuit.links:
-#                 link.endpoint_a
-#                 link.endpoint_b
-#
-#                 _install_flow(link.endpoint_a, link.endpoint_b)
-#
-#
-#     def _install_flow(self, endpoint_a, endpoit_z):
-#
-#         try:
-#             flow_manager_install_url = settings.FLOW_MANAGER_INSTALL_FLOW_URL.format(dpid=endpoint_a.dpid)
-#             result = requests.get(url=pathfinder_url)
-#
-#             log.debug(pathfinder_url)
-#
-#             if result.status_code == 200:
-#                 result = json.loads(result.content)
-#                 self._paths = result['paths']
-#             else:
-#                 raise Exception(result.status_code)
-#         except:
-#             e = sys.exc_info()
-#             log.error('Error: Can not connect to Kytos/Pathfinder: %s %s', e[0], e[1])
-#         endpoint_a
-#         endpoint_a
-#
-#
-#         result = requests.get(url=pathfinder_url)
