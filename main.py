@@ -34,7 +34,7 @@ class Main(KytosNApp):
         self._installed_circuits = {'ids': SortedDict(), 'ports': SortedDict()}
         self._pathfinder_url = 'http://localhost:8181/api/kytos/pathfinder/v1/%s/%s'
 
-        #self.execute_as_loop(30)
+        self.execute_as_loop(60)
 
     def execute(self):
         """This method is executed right after the setup method execution.
@@ -44,13 +44,7 @@ class Main(KytosNApp):
 
             self.execute_as_loop(30)  # 30-second interval.
         """
-
-
-        # for circuit in self._scheduled_circuits:
-        #     self._scheduled_circuits.remove(circuit)
-        #
-        #     # TODO check start date to install circuit
-        #     self._install_circuit(circuit)
+        self._install_scheduled_circuit()
 
 
     def shutdown(self):
@@ -108,7 +102,7 @@ class Main(KytosNApp):
             circuit = Circuit(m.hexdigest(), data['name'], endpoints)
 
             # Schedule circuit to install
-            self._scheduled_circuits.push(circuit)
+            self._scheduled_circuits.append(circuit)
 
 
 
@@ -137,7 +131,33 @@ class Main(KytosNApp):
     def circuits_by_uni(self, dpid, port):
         pass
 
-    def _install_circuit(self, circuit):
+    @rest('/circuits/triggerinstall')
+    def triggerinstall(self):
+        self._install_scheduled_circuit()
+        return json.dumps({"response": "OK"}), 200
+
+    def _install_scheduled_circuit(self):
+        # Display info messages
+        if len(self._scheduled_circuits):
+            log.info('Installing %d circuits.' % len(self._scheduled_circuits))
+
+
+        for circuit in self._scheduled_circuits:
+            try:
+                # Remove circuit from scheduled circuits, so it will not be
+                # installed more than once in case of timeout in any step
+                self._scheduled_circuits.remove(circuit)
+
+                # TODO check start date to install circuit
+                # Install circuit flows
+                self._install_circuit(circuit)
+            except:
+                # Rollback scheduled circuit remove in case of error
+                self._scheduled_circuits.append(circuit)
+                raise
+
+
+    def _install_circuit(self, circuit: Circuit):
         """Install the flows of a circuit path.
         Only the main path will be installed. The backup path will not be used here.
 
