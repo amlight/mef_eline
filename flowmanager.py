@@ -46,7 +46,7 @@ class FlowManager(object):
         # Generate flow_manager request body
         flow: Flow = self._install_flow_req_body_generator(endpoint_a, endpoint_b)
 
-        log.debug(flow.as_dict())
+        log.info("Installing flow: %s" % flow.as_dict())
 
         # Send request to flow_manager NAppp
         result = requests.post(flow_manager_install_url, json=[flow.as_dict()])
@@ -74,17 +74,22 @@ class FlowManager(object):
         flow.actions[0].value = int(endpoint_b._port)
         flow.actions[0].port = int(endpoint_b._port)
 
-        #FIXME vlan must be checked agains switch port
-        flow.match.dl_vlan = 100
 
         # Setting endpoint A vlan
         if endpoint_a._tag is not None and endpoint_a._tag.type == 'vlan':
             flow.match.dl_vlan = endpoint_a._tag.value
-        # Setting endpoint B vlan
-        if endpoint_b._tag is not None and endpoint_b._tag.type == 'vlan':
-            flow.match.dl_vlan = endpoint_b.tag.value
+        else:
+            # vlan must be checked agains switch port
+            flow.match.dl_vlan = self._generate_vlan(endpoint_a, endpoint_b)
 
         return flow
 
-    # def _generate_vlan(self, endpoint_a: Endpoint, endpoint_b: Endpoint):
-    #     switch:Switch = self.controller.get_switch_by_dpid(endpoint_a._dpid)
+    def _generate_vlan(self, endpoint_a: Endpoint, endpoint_b: Endpoint):
+        switch:Switch = self.controller.get_switch_by_dpid(endpoint_a._dpid)
+        vlans = [100]
+        for flow in switch.flows:
+            if int(endpoint_a._port) == int(flow.match.in_port) and flow.match.dl_vlan is not None:
+                vlans.append(flow.match.dl_vlan)
+
+        vlan = max(vlans) + 1
+        return vlan
