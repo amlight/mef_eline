@@ -1,5 +1,6 @@
 import datetime
 
+
 class Path:
     _id = None
     _endpoints = []
@@ -66,6 +67,7 @@ class Link:
             return False
         if Endpoint.validate(endpoint_b) is False:
             return False
+
 
 class NewCircuit:
     _name = None

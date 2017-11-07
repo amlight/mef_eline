@@ -6,16 +6,18 @@ NApp to provision circuits from user request
 from kytos.core import KytosNApp, log, rest
 from flask import request, abort
 from napps.amlight.mef_eline.models import NewCircuit, Endpoint, Circuit
+from napps.amlight.mef_eline.flowmanager import FlowManager
 import json
 import requests
 import hashlib
 from sortedcontainers import SortedDict
 
-from napps.amlight.mef_eline import settings
+from . import settings
+from .models import Endpoint
 
 
 class Main(KytosNApp):
-    """Main class of amlight/mef_eline NApp.
+    """Main class of amlight/mef_eline_old NApp.
 
     This class is the entry point for this napp.
     """
@@ -28,8 +30,11 @@ class Main(KytosNApp):
 
         So, if you have any setup routine, insert it here.
         """
+        self._scheduled_circuits = []
         self._installed_circuits = {'ids': SortedDict(), 'ports': SortedDict()}
         self._pathfinder_url = 'http://localhost:8181/api/kytos/pathfinder/v1/%s/%s'
+
+        self.execute_as_loop(60)
 
     def execute(self):
         """This method is executed right after the setup method execution.
@@ -39,7 +44,7 @@ class Main(KytosNApp):
 
             self.execute_as_loop(30)  # 30-second interval.
         """
-        pass
+        self._install_scheduled_circuit()
 
     def shutdown(self):
         """This method is executed when your napp is unloaded.
@@ -88,10 +93,17 @@ class Main(KytosNApp):
                 if len(endpoint) > 23:
                     port = endpoint[24:]
                     endpoints.append(Endpoint(dpid, port))
+
+            # TODO: check start date
+            # TODO: if there isnt a start date, set the value = NOW
+
             circuit = Circuit(m.hexdigest(), data['name'], endpoints)
-            self.add_circuit(circuit)
+
+            # Schedule circuit to install
+            self._scheduled_circuits.append(circuit)
         else:
             abort(400)
+
         return json.dumps(circuit._id)
 
     @rest('/circuit/<circuit_id>', methods=['GET', 'POST', 'DELETE'])
@@ -114,3 +126,49 @@ class Main(KytosNApp):
     @rest('/circuits/byUNI/<dpid>/<port>')
     def circuits_by_uni(self, dpid, port):
         pass
+
+    @rest('/circuits/triggerinstall')
+    def triggerinstall(self):
+        self._install_scheduled_circuit()
+        return json.dumps({"response": "OK"}), 200
+
+    def _install_scheduled_circuit(self):
+        # Install path flows from all scheduled circuits.
+        # The method remove the circuit from the schedule list and try to install the flows.
+        # In case of error, the circuit returns for the schedule list
+
+        if len(self._scheduled_circuits):
+            log.info('Installing %d circuits.' % len(self._scheduled_circuits))
+
+        rollback_circuits = []
+        for circuit in self._scheduled_circuits:
+            try:
+                # Remove circuit from scheduled circuits, so it will not be
+                # installed more than once in case of timeout in any step
+                self._scheduled_circuits.remove(circuit)
+
+                # TODO check start date to install circuit
+                # Install circuit flows
+                self._install_circuit(circuit)
+            except:
+                # In case of error, save the circuit for later treatment
+                self.rollback_circuits.append(circuit)
+
+        # Register rollback circuits to scheduled circuits to try again
+        self._scheduled_circuits.extend(rollback_circuits)
+
+    def _install_circuit(self, circuit: Circuit):
+        """Install the flows of a circuit path.
+        Only the main path will be installed. The backup path will not be used here.
+
+        Args:
+            circuit (Circuit): Circuit with a path specified to be installed
+        """
+
+        # Save the circuit
+        self.add_circuit(circuit)
+
+        # Install the circuit path
+        flowmanager = FlowManager(self.controller)
+        flowmanager.install_circuit(circuit)
+
