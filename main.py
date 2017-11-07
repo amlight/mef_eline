@@ -46,7 +46,6 @@ class Main(KytosNApp):
         """
         self._install_scheduled_circuit()
 
-
     def shutdown(self):
         """This method is executed when your napp is unloaded.
 
@@ -96,18 +95,15 @@ class Main(KytosNApp):
                     endpoints.append(Endpoint(dpid, port))
 
             # TODO: check start date
-            # se não tiver start date, colocar NOW
-            # jogar em uma fila para o deamon fazer a instalacao dos flows
+            # TODO: if there isnt a start date, set the value = NOW
 
             circuit = Circuit(m.hexdigest(), data['name'], endpoints)
 
             # Schedule circuit to install
             self._scheduled_circuits.append(circuit)
-
-
-
         else:
             abort(400)
+
         return json.dumps(circuit._id)
 
     @rest('/circuit/<circuit_id>', methods=['GET', 'POST', 'DELETE'])
@@ -137,11 +133,14 @@ class Main(KytosNApp):
         return json.dumps({"response": "OK"}), 200
 
     def _install_scheduled_circuit(self):
-        # Display info messages
+        # Install path flows from all scheduled circuits.
+        # The method remove the circuit from the schedule list and try to install the flows.
+        # In case of error, the circuit returns for the schedule list
+
         if len(self._scheduled_circuits):
             log.info('Installing %d circuits.' % len(self._scheduled_circuits))
 
-
+        rollback_circuits = []
         for circuit in self._scheduled_circuits:
             try:
                 # Remove circuit from scheduled circuits, so it will not be
@@ -152,10 +151,11 @@ class Main(KytosNApp):
                 # Install circuit flows
                 self._install_circuit(circuit)
             except:
-                # Rollback scheduled circuit remove in case of error
-                self._scheduled_circuits.append(circuit)
-                raise
+                # In case of error, save the circuit for later treatment
+                self.rollback_circuits.append(circuit)
 
+        # Register rollback circuits to scheduled circuits to try again
+        self._scheduled_circuits.extend(rollback_circuits)
 
     def _install_circuit(self, circuit: Circuit):
         """Install the flows of a circuit path.
@@ -169,6 +169,6 @@ class Main(KytosNApp):
         self.add_circuit(circuit)
 
         # Install the circuit path
-        flowManager = FlowManager(self.controller)
-        flowManager.install_circuit(circuit)
+        flowmanager = FlowManager(self.controller)
+        flowmanager.install_circuit(circuit)
 

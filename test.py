@@ -11,7 +11,7 @@ from kytos.core.controller import Controller
 from kytos.core.switch import Switch
 
 # from .main import CircuitManager
-from napps.amlight.mef_eline.models import Endpoint, Circuit, Path
+from napps.amlight.mef_eline.models import Endpoint, Circuit, Path, Tag
 # from .pathfinder import Pathfinder
 from .flowmanager import FlowManager
 
@@ -72,14 +72,24 @@ class TestFlowManager(TestCase):
         flowmanager = FlowManager(c)
 
         endpoint_a = Endpoint('00:00:00:00:00:00:00:01', 1)
+        # endpoint_a._tag = Tag()
+        # endpoint_a._tag._type = "vlan"
+        # endpoint_a._tag._value = "200"
+
         endpoint_b = Endpoint('00:00:00:00:00:00:00:01', 2)
         endpoint_c = Endpoint('00:00:00:00:00:00:00:02', 1)
         endpoint_d = Endpoint('00:00:00:00:00:00:00:02', 2)
         endpoint_e = Endpoint('00:00:00:00:00:00:00:04', 1)
         endpoint_f = Endpoint('00:00:00:00:00:00:00:04', 2)
+        # endpoint_f._tag = Tag()
+        # endpoint_f._tag._type = "vlan"
+        # endpoint_f._tag._value = "200"
 
-        path = Path()
-        path._endpoints = [endpoint_a, endpoint_b, endpoint_c, endpoint_d, endpoint_e, endpoint_f]
+
+        #FIXME path should be an object
+        #path = Path()
+        #path._endpoints = [endpoint_a, endpoint_b, endpoint_c, endpoint_d, endpoint_e, endpoint_f]
+        path = [endpoint_a, endpoint_b, endpoint_c, endpoint_d, endpoint_e, endpoint_f]
 
         circuit = Circuit(0, 'circuitA', path)
 

@@ -1,5 +1,6 @@
 import datetime
 
+
 class Path:
     _id = None
     _endpoints = []
@@ -28,8 +29,6 @@ class Endpoint:
             if Tag.validade(tag) is False:
                 return False
         return True
-
-
 
 
 class Tag:
@@ -68,6 +67,7 @@ class Link:
             return False
         if Endpoint.validate(endpoint_b) is False:
             return False
+
 
 class NewCircuit:
     _name = None
