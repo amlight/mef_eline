@@ -4,6 +4,29 @@ class Path:
     _id = None
     _endpoints = []
 
+    def __init__(self, endpoints):
+        self._endpoints = endpoints
+
+    @staticmethod
+    def validade(data):
+        if not isinstance(data, dict):
+            return False
+        try:
+            endpoints = data['endpoints']
+            for endpoint in endpoints:
+                if Endpoint.validate(endpoint)is False:
+                    return False
+        except KeyError:
+            return False
+        return True
+
+    def to_dict(self):
+        path_dict = {'endpoints': []}
+        for endpoint in self._endpoints:
+            path_dict['endpoints'].append(endpoint.to_dict())
+
+        return path_dict
+
 
 class Endpoint:
     _dpid = None
@@ -29,10 +52,23 @@ class Endpoint:
                 return False
         return True
 
+    def to_dict(self):
+        endpoint_dict = {}
+        endpoint_dict['dpid'] = self._dpid
+        endpoint_dict['port'] = self._port
+        if self._tag:
+            endpoint_dict['tag'] = self._tag.to_dict()
+
+        return endpoint_dict
+
 
 class Tag:
     _type = None
     _value = None
+
+    def __init__(self, type, value):
+        self._type = type
+        self._value = value
 
     @staticmethod
     def validate(data):
@@ -47,6 +83,13 @@ class Tag:
         except TypeError:
             return False
         return True
+
+    def to_dict(self):
+        tag_dict = {}
+        tag_dict['type'] = self._type
+        tag_dict['value'] = self._value
+
+        return tag_dict
 
 
 class Link:
@@ -66,6 +109,14 @@ class Link:
             return False
         if Endpoint.validate(endpoint_b) is False:
             return False
+        return True
+
+    def to_dict(self):
+        link_dict = {}
+        link_dict['endpoint_a'] = self._endpoint_a.to_dict()
+        link_dict['endpoint_b'] = self._endpoint_b.to_dict()
+
+        return link_dict
 
 class NewCircuit:
     _name = None
@@ -80,10 +131,11 @@ class NewCircuit:
     def validate(data):
         if not isinstance(data, dict):
             return False
-        uni_a = data.get('uni_a')
-        uni_z = data.get('uni_z')
-        name = data.get('name')
-        if uni_a is None or uni_z is None or name is None:
+        try:
+            uni_a = data['uni_a']
+            uni_z = data['uni_z']
+            name = data['name']
+        except KeyError:
             return False
         if Endpoint.validate(uni_a) is False:
             return False
@@ -141,3 +193,45 @@ class Circuit:
         self._end_date = end_date
         self._path = path
         self._backup_path = backup_path
+
+    @staticmethod
+    def validate(data):
+        if not isinstance(data, dict):
+            return False
+        try:
+            name = data['name']
+            path = data['path']
+        except KeyError:
+            return False
+        if Path.validade(path) is False:
+            return False
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        backup_path = data.get('backup_path')
+
+        if start_date:
+            try:
+                datetime.datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                return False
+        if end_date:
+            try:
+                datetime.datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                return False
+        if backup_path:
+            if Path.validade(backup_path) is False:
+                return False
+        return True
+
+    def to_dict(self):
+        circuit_dict = {}
+        circuit_dict['id'] = self._id
+        circuit_dict['name'] = self._name
+        circuit_dict['start_date'] = self._start_date
+        circuit_dict['end_date'] = self._end_date
+        circuit_dict['path'] = self._path.to_dict()
+        if self._backup_path:
+            circuit_dict['backup_path'] = self._backup_path.to_dict()
+
+        return circuit_dict

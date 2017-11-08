@@ -5,7 +5,7 @@ NApp to provision circuits from user request
 
 from kytos.core import KytosNApp, log, rest
 from flask import request, abort
-from napps.amlight.mef_eline.models import NewCircuit, Endpoint, Circuit
+from napps.amlight.mef_eline.models import NewCircuit, Endpoint, Circuit, Path, Tag
 import json
 import requests
 import hashlib
@@ -50,8 +50,10 @@ class Main(KytosNApp):
 
     def add_circuit(self, circuit):
         self._installed_circuits['ids'][circuit._id] = circuit
-        for endpoint in circuit._path:
-            self._installed_circuits['ports']['%s:%s' % (endpoint._dpid, endpoint._port)] = circuit._id
+        for endpoint in circuit._path._endpoints:
+            if self._installed_circuits['ports'].get('%s:%s' % (endpoint._dpid, endpoint._port)) is None:
+                self._installed_circuits['ports']['%s:%s' % (endpoint._dpid, endpoint._port)] = []
+            self._installed_circuits['ports']['%s:%s' % (endpoint._dpid, endpoint._port)].append(circuit._id)
 
     @rest('/circuit', methods=['POST'])
     def create_circuit(self):
@@ -87,25 +89,74 @@ class Main(KytosNApp):
                 dpid = endpoint[:23]
                 if len(endpoint) > 23:
                     port = endpoint[24:]
-                    endpoints.append(Endpoint(dpid, port))
-            circuit = Circuit(m.hexdigest(), data['name'], endpoints)
+                    if dpid == uni_a['dpid'] and port == uni_a['port']:
+                            tag = Tag(uni_a['tag']['type'], uni_a['tag']['value'])
+                    elif dpid == uni_z['dpid'] and port == uni_z['port']:
+                        tag = Tag(uni_a['tag']['type'], uni_a['tag']['value'])
+                    else:
+                        tag = None
+                    endpoints.append(Endpoint(dpid, port, tag))
+            circuit = Circuit(m.hexdigest(), data['name'], Path(endpoints))
             self.add_circuit(circuit)
         else:
             abort(400)
-        return json.dumps(circuit._id)
+        return json.dumps(circuit._id), 200, {'Content-Type' : 'application/json; charset=utf-8'}
 
     @rest('/circuit/<circuit_id>', methods=['GET', 'POST', 'DELETE'])
     def circuit_operation(self, circuit_id):
         if request.method == 'GET':
-            pass
+            try:
+                circuit = self._installed_circuits['ids'].get(circuit_id)
+                return json.dumps(circuit.to_dict()), 200, {'Content-Type' : 'application/json; charset=utf-8'}
+            except KeyError:
+                abort(404)
         elif request.method == 'POST':
-            pass
+            try:
+                circuit = self._installed_circuits['ids'].get(circuit_id)
+                data = request.get_json()
+                if Circuit.validate(data):
+                    circuit._name = data['name']
+                    endpoints = []
+                    try:
+                        for endpoint in data['path']['endpoints']:
+                            dpid = endpoint['dpid']
+                            port = endpoint['port']
+                            endpoints.append(Endpoint(dpid, port))
+                    except KeyError:
+                        pass
+                    circuit._path = Path(endpoints)
+                    # Remove old circuit path from ports dict
+                    for circuits in self._installed_circuits['ports'].values():
+                        try:
+                            circuits.remove(circuit_id)
+                        except ValueError:
+                            pass
+                    self.add_circuit(circuit)
+                else:
+                    abort(400)
+                return json.dumps(circuit_id), 200, {'Content-Type' : 'application/json; charset=utf-8'}
+            except KeyError:
+                abort(404)
         elif request.method == 'DELETE':
-            pass
+            circuit = self._installed_circuits['ids'].get(circuit_id)
+            if circuit:
+                # TODO: remove flows from switches
+                del self._installed_circuits['ids'][circuit_id]
+                for circuits in self._installed_circuits['ports'].values():
+                    try:
+                        circuits.remove(circuit_id)
+                    except ValueError:
+                        pass
+                return json.dumps("Ok"), 200, {'Content-Type' : 'application/json; charset=utf-8'}
+            else:
+                abort(404)
 
     @rest('/circuits', methods=['GET'])
     def get_circuits(self):
-        pass
+        circuits = []
+        for circuit in self._installed_circuits['ids'].values():
+            circuits.append(circuit.to_dict())
+        return json.dumps(circuits), 200, {'Content-Type' : 'application/json; charset=utf-8'}
 
     @rest('/circuits/byLink/<link_id>')
     def circuits_by_link(self, link_id):
@@ -113,4 +164,11 @@ class Main(KytosNApp):
 
     @rest('/circuits/byUNI/<dpid>/<port>')
     def circuits_by_uni(self, dpid, port):
-        pass
+        port = '%s:%s' % (dpid, port)
+        circuits = []
+        if not self._installed_circuits['ports'].get(port):
+            abort(404)
+        for circuit_id in self._installed_circuits['ports'][port]:
+            circuit = self._installed_circuits['ids'].get(circuit_id)
+            circuits.append(circuit.to_dict())
+        return json.dumps(circuits), 200, {'Content-Type' : 'application/json; charset=utf-8'}
