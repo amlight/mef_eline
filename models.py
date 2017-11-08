@@ -1,5 +1,6 @@
 import datetime
 
+
 class Path:
     _id = None
     _endpoints = []
@@ -117,6 +118,7 @@ class Link:
         link_dict['endpoint_b'] = self._endpoint_b.to_dict()
 
         return link_dict
+
 
 class NewCircuit:
     _name = None
