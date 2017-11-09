@@ -1,5 +1,5 @@
 import datetime
-
+from kytos.core import log
 
 class Path:
     _id = None
@@ -29,6 +29,37 @@ class Path:
         return path_dict
 
 
+class Tag:
+    _type = None
+    _value = None
+
+    def __init__(self, tag_type, value):
+        self._type = tag_type
+        self._value = value
+
+    @staticmethod
+    def validate(data):
+        if not isinstance(data, dict):
+            return False
+        tag_type = data.get('type')
+        value = data.get('value')
+        log.info('aaa %s %s' % (tag_type, value))
+        if tag_type is None or value is None:
+            return False
+        try:
+            int(value)
+        except TypeError:
+            return False
+        return True
+
+    def to_dict(self):
+        tag_dict = {}
+        tag_dict['type'] = self._type
+        tag_dict['value'] = self._value
+
+        return tag_dict
+
+
 class Endpoint:
     _dpid = None
     _port = None
@@ -49,7 +80,7 @@ class Endpoint:
             return False
         tag = data.get('tag')
         if tag is not None:
-            if Tag.validade(tag) is False:
+            if Tag.validate(tag) is False:
                 return False
         return True
 
@@ -61,36 +92,6 @@ class Endpoint:
             endpoint_dict['tag'] = self._tag.to_dict()
 
         return endpoint_dict
-
-
-class Tag:
-    _type = None
-    _value = None
-
-    def __init__(self, type, value):
-        self._type = type
-        self._value = value
-
-    @staticmethod
-    def validate(data):
-        if not isinstance(data, dict):
-            return False
-        type = data.get('type')
-        value = data.get('value')
-        if type is None or value is None:
-            return False
-        try:
-            int(value)
-        except TypeError:
-            return False
-        return True
-
-    def to_dict(self):
-        tag_dict = {}
-        tag_dict['type'] = self._type
-        tag_dict['value'] = self._value
-
-        return tag_dict
 
 
 class Link:

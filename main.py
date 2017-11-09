@@ -4,6 +4,7 @@ NApp to provision circuits from user request
 """
 
 from kytos.core import KytosNApp, log, rest
+from kytos.core.helpers import listen_to
 from flask import request, abort
 from napps.amlight.mef_eline.models import NewCircuit, Endpoint, Circuit, Path, Tag
 from napps.amlight.mef_eline.flowmanager import FlowManager
@@ -34,7 +35,7 @@ class Main(KytosNApp):
         self._installed_circuits = {'ids': SortedDict(), 'ports': SortedDict()}
         self._pathfinder_url = 'http://localhost:8181/api/kytos/pathfinder/v1/%s/%s'
 
-        self.execute_as_loop(60)
+        self.execute_as_loop(10)
 
     def execute(self):
         """This method is executed right after the setup method execution.
@@ -56,9 +57,11 @@ class Main(KytosNApp):
     def add_circuit(self, circuit):
         self._installed_circuits['ids'][circuit._id] = circuit
         for endpoint in circuit._path._endpoints:
-            if self._installed_circuits['ports'].get('%s:%s' % (endpoint._dpid, endpoint._port)) is None:
-                self._installed_circuits['ports']['%s:%s' % (endpoint._dpid, endpoint._port)] = []
-            self._installed_circuits['ports']['%s:%s' % (endpoint._dpid, endpoint._port)].append(circuit._id)
+            try:
+                if circuit._id not in self._installed_circuits['ports']['%s:%s' % (endpoint._dpid, endpoint._port)]:
+                    self._installed_circuits['ports']['%s:%s' % (endpoint._dpid, endpoint._port)].append(circuit._id)
+            except KeyError:
+                self._installed_circuits['ports']['%s:%s' % (endpoint._dpid, endpoint._port)] = [circuit._id]
 
     @rest('/circuit', methods=['POST'])
     def create_circuit(self):
@@ -94,11 +97,14 @@ class Main(KytosNApp):
                 dpid = endpoint[:23]
                 if len(endpoint) > 23:
                     port = endpoint[24:]
-                    if dpid == uni_a['dpid'] and port == uni_a['port']:
+                    try:
+                        if dpid == uni_a['dpid'] and port == uni_a['port']:
                             tag = Tag(uni_a['tag']['type'], uni_a['tag']['value'])
-                    elif dpid == uni_z['dpid'] and port == uni_z['port']:
-                        tag = Tag(uni_a['tag']['type'], uni_a['tag']['value'])
-                    else:
+                        elif dpid == uni_z['dpid'] and port == uni_z['port']:
+                            tag = Tag(uni_a['tag']['type'], uni_a['tag']['value'])
+                        else:
+                            tag = None
+                    except KeyError:
                         tag = None
                     endpoints.append(Endpoint(dpid, port, tag))
             circuit = Circuit(m.hexdigest(), data['name'], Path(endpoints))
@@ -171,11 +177,12 @@ class Main(KytosNApp):
     def circuits_by_uni(self, dpid, port):
         port = '%s:%s' % (dpid, port)
         circuits = []
-        if not self._installed_circuits['ports'].get(port):
+        try:
+            for circuit_id in self._installed_circuits['ports'][port]:
+                circuit = self._installed_circuits['ids'].get(circuit_id)
+                circuits.append(circuit.to_dict())
+        except KeyError:
             abort(404)
-        for circuit_id in self._installed_circuits['ports'][port]:
-            circuit = self._installed_circuits['ids'].get(circuit_id)
-            circuits.append(circuit.to_dict())
         return json.dumps(circuits), 200, {'Content-Type' : 'application/json; charset=utf-8'}
 
     @rest('/circuits/triggerinstall')
@@ -201,9 +208,10 @@ class Main(KytosNApp):
                 # TODO check start date to install circuit
                 # Install circuit flows
                 self._install_circuit(circuit)
-            except:
+            except Exception as e:
+                log.error('Exception raised %s' % e)
                 # In case of error, save the circuit for later treatment
-                self.rollback_circuits.append(circuit)
+                rollback_circuits.append(circuit)
 
         # Register rollback circuits to scheduled circuits to try again
         self._scheduled_circuits.extend(rollback_circuits)
@@ -218,7 +226,33 @@ class Main(KytosNApp):
 
         # Save the circuit
         self.add_circuit(circuit)
-
+        log.info('Installing 1')
         # Install the circuit path
-        flowmanager = FlowManager(self.controller)
-        flowmanager.install_circuit(circuit)
+        flow_manager = FlowManager(self.controller)
+        flow_manager.install_circuit(circuit)
+
+    @listen_to('kytos/of_core.switch.interface.*')
+    def update_circuits(self, event):
+        log.info('Port status modified detected')
+        interface = event.content['interface']
+        port = '%s:%s' % (interface.switch.dpid, interface.port_number)
+
+        try:
+            for circuit_id in self._installed_circuits['ports'][port]:
+                circuit = self._installed_circuits['ids'][circuit_id]
+                if self.test_uni(circuit, interface.switch.dpid, interface.port_number):
+                    continue
+                log.info('Circuit %s' % circuit)
+                # TODO: modify path
+
+        except KeyError:
+            pass
+
+    def test_uni(self, circuit, dpid, port):
+        uni_a = circuit._path._endpoints[0]
+        uni_z = circuit._path._endpoints[-1]
+        if (uni_a._dpid == dpid and int(uni_a._port) == int(port)) \
+                or (uni_z._dpid == dpid and int(uni_z._port) == int(port)):
+            log.info('UNI is down!')
+            return True
+        return False
