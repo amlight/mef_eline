@@ -34,7 +34,7 @@ class Main(KytosNApp):
         self._scheduled_circuits = []
         self._installed_circuits = {'ids': SortedDict(), 'ports': SortedDict()}
 
-        self.execute_as_loop(10)
+        self.execute_as_loop(settings.INSTALL_INTERVAL)
 
     def execute(self):
         """This method is executed right after the setup method execution.

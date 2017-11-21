@@ -7,6 +7,7 @@ FLOW_MANAGER_INSTALL_FLOW_URL = KYTOS_NAPP_SERVER + '/api/kytos/flow_manager/v1/
 PATHFINDER_URL = \
     KYTOS_NAPP_SERVER + \
     '/api/kytos/pathfinder/v1/{dpid_a}:{port_a}/{dpid_z}:{port_z}'
+INSTALL_INTERVAL = 40
 
 # Flow template to use do call the flow manager
 flow_dict_v10 = {'idle_timeout': 0, 'hard_timeout': 0, 'table_id': 0, 'buffer_id': None,
