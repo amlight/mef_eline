@@ -199,6 +199,7 @@ class Main(KytosNApp):
             log.info('Installing %d circuits.' % len(self._scheduled_circuits))
 
         rollback_circuits = []
+        flow_manager = FlowManager(self.controller)
         for circuit in self._scheduled_circuits:
             try:
                 # Remove circuit from scheduled circuits, so it will not be
@@ -216,7 +217,7 @@ class Main(KytosNApp):
         # Register rollback circuits to scheduled circuits to try again
         self._scheduled_circuits.extend(rollback_circuits)
 
-    def _install_circuit(self, circuit: Circuit):
+    def _install_circuit(self, circuit: Circuit, flow_manager):
         """Install the flows of a circuit path.
         Only the main path will be installed. The backup path will not be used here.
 
@@ -226,9 +227,7 @@ class Main(KytosNApp):
 
         # Save the circuit
         self.add_circuit(circuit)
-        log.info('Installing 1')
         # Install the circuit path
-        flow_manager = FlowManager(self.controller)
         flow_manager.install_circuit(circuit)
 
     @listen_to('kytos/of_core.switch.interface.*')
