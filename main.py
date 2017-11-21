@@ -33,7 +33,6 @@ class Main(KytosNApp):
         """
         self._scheduled_circuits = []
         self._installed_circuits = {'ids': SortedDict(), 'ports': SortedDict()}
-        self._pathfinder_url = 'http://localhost:8181/api/kytos/pathfinder/v1/%s/%s'
 
         self.execute_as_loop(10)
 
@@ -75,9 +74,10 @@ class Main(KytosNApp):
         if NewCircuit.validate(data):
             uni_a = data['uni_a']
             uni_z = data['uni_z']
-            url = self._pathfinder_url % ('%s:%s' % (uni_a['dpid'], uni_a['port']),
-                                          '%s:%s' % (uni_z['dpid'], uni_z['port']))
-            log.info("Pathfinder URL: %s" % url)
+            url = settings.PATHFINDER_URL.format(dpid_a=uni_a['dpid'],
+                                                 port_a=uni_a['port'],
+                                                 dpid_z=uni_z['dpid'],
+                                                 port_z=uni_z['port'])
             r = requests.get(url)
             if r.status_code // 100 != 2:
                 log.error('Pathfinder returned error code %s.' % r.status_code)
