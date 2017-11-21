@@ -59,6 +59,8 @@ class Tag:
 
         return tag_dict
 
+    def __eq__(self, other):
+        return self._type == other._type and self._value == other._value
 
 class Endpoint:
     _dpid = None
