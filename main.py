@@ -3,17 +3,18 @@
 NApp to provision circuits from user request
 """
 
+import json
+import hashlib
+import requests
 from kytos.core import KytosNApp, log, rest
 from kytos.core.helpers import listen_to
 from flask import request, abort
-from napps.amlight.mef_eline.models import NewCircuit, Endpoint, Circuit, Path, Tag
+from napps.amlight.mef_eline import settings
+from napps.amlight.mef_eline.models import NewCircuit, Endpoint, Circuit
+from napps.amlight.mef_eline.models import Path, Tag
 from napps.amlight.mef_eline.flowmanager import FlowManager
-import json
-import requests
-import hashlib
 from sortedcontainers import SortedDict
 
-from . import settings
 from .models import Endpoint
 
 
@@ -54,20 +55,26 @@ class Main(KytosNApp):
         pass
 
     def add_circuit(self, circuit):
+        """
+        Add a circuit to the dictionaries of installed circuits
+        :param circuit: an instance of Circuit
+        """
         self._installed_circuits['ids'][circuit._id] = circuit
         for endpoint in circuit._path._endpoints:
+            ep = '%s:%s' % (endpoint._dpid, endpoint._port)
             try:
-                if circuit._id not in self._installed_circuits['ports']['%s:%s' % (endpoint._dpid, endpoint._port)]:
-                    self._installed_circuits['ports']['%s:%s' % (endpoint._dpid, endpoint._port)].append(circuit._id)
+                if circuit._id not in self._installed_circuits['ports'][ep]:
+                    self._installed_circuits['ports'][ep].append(circuit._id)
             except KeyError:
-                self._installed_circuits['ports']['%s:%s' % (endpoint._dpid, endpoint._port)] = [circuit._id]
+                self._installed_circuits['ports'][ep] = [circuit._id]
 
     @rest('/circuit', methods=['POST'])
     def create_circuit(self):
         """
-        Receive a user request to create a new circuit, find a path for the circuit,
-        install the necessary flows and stores the information about it.
-        :return: 
+        Receive a user request to create a new circuit, find a path for
+        the circuit, install the necessary flows and stores the
+        information about it.
+        :return:
         """
         data = request.get_json()
 
@@ -111,14 +118,21 @@ class Main(KytosNApp):
             self._scheduled_circuits.append(circuit)
         else:
             abort(400)
-        return json.dumps(circuit._id), 200, {'Content-Type' : 'application/json; charset=utf-8'}
+        return json.dumps(circuit._id), 200, \
+               {'Content-Type': 'application/json; charset=utf-8'}
 
     @rest('/circuit/<circuit_id>', methods=['GET', 'POST', 'DELETE'])
     def circuit_operation(self, circuit_id):
+        """
+        Operations on a single circuit: Retrieve, update and delete.
+        :param circuit_id: 
+        :return: 
+        """
         if request.method == 'GET':
             try:
                 circuit = self._installed_circuits['ids'].get(circuit_id)
-                return json.dumps(circuit.to_dict()), 200, {'Content-Type' : 'application/json; charset=utf-8'}
+                return (json.dumps(circuit.to_dict()), 200,
+                        {'Content-Type' : 'application/json; charset=utf-8'})
             except KeyError:
                 abort(404)
         elif request.method == 'POST':
@@ -145,7 +159,8 @@ class Main(KytosNApp):
                     self.add_circuit(circuit)
                 else:
                     abort(400)
-                return json.dumps(circuit_id), 200, {'Content-Type' : 'application/json; charset=utf-8'}
+                return json.dumps(circuit_id), 200, \
+                       {'Content-Type': 'application/json; charset=utf-8'}
             except KeyError:
                 abort(404)
         elif request.method == 'DELETE':
@@ -158,16 +173,22 @@ class Main(KytosNApp):
                         circuits.remove(circuit_id)
                     except ValueError:
                         pass
-                return json.dumps("Ok"), 200, {'Content-Type' : 'application/json; charset=utf-8'}
+                return json.dumps("Ok"), 200, \
+                       {'Content-Type': 'application/json; charset=utf-8'}
             else:
                 abort(404)
 
     @rest('/circuits', methods=['GET'])
     def get_circuits(self):
+        """
+        Get all installed circuits
+        :return: 
+        """
         circuits = []
         for circuit in self._installed_circuits['ids'].values():
             circuits.append(circuit.to_dict())
-        return json.dumps(circuits), 200, {'Content-Type' : 'application/json; charset=utf-8'}
+        return json.dumps(circuits), 200, \
+               {'Content-Type': 'application/json; charset=utf-8'}
 
     @rest('/circuits/byLink/<link_id>')
     def circuits_by_link(self, link_id):
@@ -175,6 +196,12 @@ class Main(KytosNApp):
 
     @rest('/circuits/byUNI/<dpid>/<port>')
     def circuits_by_uni(self, dpid, port):
+        """
+        Get all circuits using given UNI
+        :param dpid: 
+        :param port: 
+        :return: 
+        """
         port = '%s:%s' % (dpid, port)
         circuits = []
         try:
@@ -183,7 +210,8 @@ class Main(KytosNApp):
                 circuits.append(circuit.to_dict())
         except KeyError:
             abort(404)
-        return json.dumps(circuits), 200, {'Content-Type' : 'application/json; charset=utf-8'}
+        return json.dumps(circuits), 200, \
+               {'Content-Type': 'application/json; charset=utf-8'}
 
     @rest('/circuits/triggerinstall')
     def triggerinstall(self):
@@ -195,7 +223,7 @@ class Main(KytosNApp):
         # The method remove the circuit from the schedule list and try to install the flows.
         # In case of error, the circuit returns for the schedule list
 
-        if len(self._scheduled_circuits):
+        if self._scheduled_circuits:
             log.info('Installing %d circuits.' % len(self._scheduled_circuits))
 
         rollback_circuits = []
@@ -204,9 +232,9 @@ class Main(KytosNApp):
             try:
                 # TODO check start date to install circuit
                 # Install circuit flows
-            except Exception as e:
-                log.error('Exception raised %s' % e)
                 self._install_circuit(circuit, flow_manager)
+            except Exception as error:
+                log.error('Exception raised %s' % error)
                 # In case of error, save the circuit for later treatment
                 rollback_circuits.append(circuit)
 
@@ -237,13 +265,13 @@ class Main(KytosNApp):
                 circuit = self._installed_circuits['ids'][circuit_id]
                 if self.test_uni(circuit, interface.switch.dpid, interface.port_number):
                     continue
-                log.info('Circuit %s' % circuit)
                 # TODO: modify path
 
         except KeyError:
             pass
 
-    def test_uni(self, circuit, dpid, port):
+    @staticmethod
+    def test_uni(circuit, dpid, port):
         uni_a = circuit._path._endpoints[0]
         uni_z = circuit._path._endpoints[-1]
         if (uni_a._dpid == dpid and int(uni_a._port) == int(port)) \
