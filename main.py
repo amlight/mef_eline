@@ -202,20 +202,16 @@ class Main(KytosNApp):
         flow_manager = FlowManager(self.controller)
         for circuit in self._scheduled_circuits:
             try:
-                # Remove circuit from scheduled circuits, so it will not be
-                # installed more than once in case of timeout in any step
-                self._scheduled_circuits.remove(circuit)
-
                 # TODO check start date to install circuit
                 # Install circuit flows
-                self._install_circuit(circuit)
             except Exception as e:
                 log.error('Exception raised %s' % e)
+                self._install_circuit(circuit, flow_manager)
                 # In case of error, save the circuit for later treatment
                 rollback_circuits.append(circuit)
 
         # Register rollback circuits to scheduled circuits to try again
-        self._scheduled_circuits.extend(rollback_circuits)
+        self._scheduled_circuits = rollback_circuits
 
     def _install_circuit(self, circuit: Circuit, flow_manager):
         """Install the flows of a circuit path.
