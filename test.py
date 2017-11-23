@@ -72,24 +72,23 @@ class TestFlowManager(TestCase):
         flowmanager = FlowManager(c)
 
         endpoint_a = Endpoint('00:00:00:00:00:00:00:01', 1)
-        # endpoint_a._tag = Tag()
-        # endpoint_a._tag._type = "vlan"
-        # endpoint_a._tag._value = "200"
+        endpoint_a._tag = Tag('ctag', 200)
 
         endpoint_b = Endpoint('00:00:00:00:00:00:00:01', 2)
         endpoint_c = Endpoint('00:00:00:00:00:00:00:02', 1)
         endpoint_d = Endpoint('00:00:00:00:00:00:00:02', 2)
         endpoint_e = Endpoint('00:00:00:00:00:00:00:04', 1)
         endpoint_f = Endpoint('00:00:00:00:00:00:00:04', 2)
-        # endpoint_f._tag = Tag()
-        # endpoint_f._tag._type = "vlan"
-        # endpoint_f._tag._value = "200"
+        endpoint_f._tag = Tag('ctag', 200)
 
 
         #FIXME path should be an object
-        #path = Path()
-        #path._endpoints = [endpoint_a, endpoint_b, endpoint_c, endpoint_d, endpoint_e, endpoint_f]
-        path = [endpoint_a, endpoint_b, endpoint_c, endpoint_d, endpoint_e, endpoint_f]
+        path = Path([endpoint_a,
+                     endpoint_b,
+                     endpoint_c,
+                     endpoint_d,
+                     endpoint_e,
+                     endpoint_f])
 
         circuit = Circuit(0, 'circuitA', path)
 
